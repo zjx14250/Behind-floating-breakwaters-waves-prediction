@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import math
 
 
 def get_frequency_modes(seq_len, modes=64, mode_select_method='random'):
@@ -22,16 +23,29 @@ def get_frequency_modes(seq_len, modes=64, mode_select_method='random'):
     return index
 
 
-# ########## fourier layer #############
+# ########## DBFMM #############
 class FourierBlock(nn.Module):
     def __init__(self, in_channels, out_channels, seq_len, modes=0, mode_select_method='random'):
         super(FourierBlock, self).__init__()
         print('fourier enhanced block used!')
-        """
-        1D Fourier block. It performs representation learning on frequency domain, 
-        it does FFT, linear transform, and Inverse FFT.    
-        """
-        # get modes on frequency domain
+        
+        self.seq_len = seq_len
+        n_freqs = seq_len // 2 + 1  
+        
+        ts = 1.0/seq_len
+        t = torch.arange(0, 1, ts)
+        
+        for i in range(n_freqs):
+            if i == 0:
+                cos = 0.5 * torch.cos(2*math.pi*i*t).unsqueeze(0)
+                sin = -0.5 * torch.sin(2*math.pi*i*t).unsqueeze(0)
+            else:
+                cos=torch.vstack([cos,torch.cos(2*math.pi*i*t).unsqueeze(0)])
+                sin=torch.vstack([sin,-torch.sin(2*math.pi*i*t).unsqueeze(0)]) 
+            
+        self.cos = nn.Parameter(cos, requires_grad=False)
+        self.sin = nn.Parameter(sin, requires_grad=False)
+
         self.index = get_frequency_modes(seq_len, modes=modes, mode_select_method=mode_select_method)
         print('modes={}, index={}'.format(modes, self.index))
 
@@ -58,21 +72,18 @@ class FourierBlock(nn.Module):
             return torch.einsum(order, x.real, weights.real)
 
     def forward(self, q, k, v, mask):
-        # size = [B, L, H, E]
-        B, L, H, E = q.shape
-        # [B, L, H, E] -> [B, H, E, L]
+        B, L, H, E = q.shape  
         x = q.permute(0, 2, 3, 1) 
-        # Compute Fourier coefficients
-        x_ft = torch.fft.rfft(x, dim=-1) # [B, H, E, L//2 + 1]
-        # Perform Fourier neural operations
-        out_ft = torch.zeros(B, H, E, L // 2 + 1, device=x.device, dtype=torch.cfloat)
-        for wi, i in enumerate(self.index):
-            if i >= x_ft.shape[3] or wi >= out_ft.shape[3]:
-                continue
-            out_ft[:, :, :, wi] = self.compl_mul1d("bhi,hio->bho", x_ft[:, :, :, i],
-                                                   torch.complex(self.weights1, self.weights2)[:, :, :, wi])
-        # Return to time domain
-        x = torch.fft.irfft(out_ft, n=x.size(-1))
+
+        x_ft = torch.fft.rfft(x, dim=-1)  # [B, H, E, L//2 + 1]
+        norm = x.size(-1)
+        x_ft = x_ft / (norm) * 2
+
+        basis_cos = torch.einsum('bhef,fl->bhel', x_ft.real, self.cos)
+        basis_sin = torch.einsum('bhef,fl->bhel', x_ft.imag, self.sin)  
+        
+        x = basis_cos + basis_sin
+
         return (x, None)
 
 

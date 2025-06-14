@@ -117,14 +117,30 @@ class DataEmbedding(nn.Module):
             d_model=d_model, embed_type=embed_type, freq=freq)
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x, x_mark):
+    def forward(self, x, x_mark=None):
         if x_mark is None:
             x = self.value_embedding(x) + self.position_embedding(x)
         else:
-            x = self.value_embedding(
-                x) + self.temporal_embedding(x_mark) + self.position_embedding(x)
+            x = self.value_embedding(x) + self.temporal_embedding(x_mark) + self.position_embedding(x)
         return self.dropout(x)
+  
+class DataEmbedding_original(nn.Module):
+    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+        super(DataEmbedding_original, self).__init__()
 
+        self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
+        self.position_embedding = PositionalEmbedding(d_model=d_model)
+        self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
+                                                    freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
+            d_model=d_model, embed_type=embed_type, freq=freq)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x, x_mark):
+        if x_mark is None:
+            x = self.value_embedding(x)
+        else:
+            x = self.value_embedding(x) + self.temporal_embedding(x_mark)
+        return self.dropout(x)
 
 class DataEmbedding_inverted(nn.Module):
     def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
@@ -141,6 +157,25 @@ class DataEmbedding_inverted(nn.Module):
             x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1))
         # x: [Batch Variate d_model]
         return self.dropout(x)
+    
+class DataEmbedding_inverted_position(nn.Module):
+    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+        super(DataEmbedding_inverted_position, self).__init__()
+        self.value_embedding = nn.Linear(c_in, d_model)
+        self.dropout = nn.Dropout(p=dropout)
+        self.position_embedding = PositionalEmbedding(d_model=d_model)
+
+    def forward(self, x, x_mark=None):
+        x = x.permute(0, 2, 1)
+        # x: [Batch Variate Time]
+        if x_mark is None:
+            x = self.value_embedding(x)
+        else:
+            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1))
+        # x: [Batch Variate d_model]
+        pos_embed = self.position_embedding(x)  # 获取位置嵌入 [Batch, Variate, d_model]
+        x = x + pos_embed  # 添加位置嵌入
+        return self.dropout(x)
 
 
 class DataEmbedding_wo_pos(nn.Module):
@@ -154,7 +189,7 @@ class DataEmbedding_wo_pos(nn.Module):
             d_model=d_model, embed_type=embed_type, freq=freq)
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x, x_mark):
+    def forward(self, x, x_mark=None):
         if x_mark is None:
             x = self.value_embedding(x)
         else:
@@ -188,3 +223,15 @@ class PatchEmbedding(nn.Module):
         # Input encoding
         x = self.value_embedding(x) + self.position_embedding(x)
         return self.dropout(x), n_vars
+    
+class WITRAN_Temporal_Embedding(nn.Module):
+    def __init__(self, d_inp, d_model, embed_type='fixed', freq='h', dropout=0.1):
+        super(WITRAN_Temporal_Embedding, self).__init__()
+
+        self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
+                                                    freq=freq) if embed_type != 'timeF' \
+            else nn.Linear(d_inp, d_model, bias=False)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x_mark):
+        return self.dropout(self.temporal_embedding(x_mark))
