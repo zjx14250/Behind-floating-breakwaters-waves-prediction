@@ -1,8 +1,9 @@
 # E2E-FANet: A Highly Generalizable Framework for Waves prediction Behind Floating Breakwaters via Exogenous-to-Endogenous Variable Attention
 
 
+### This project is qualified for participation in the "National Pioneer Cup on Intelligent Computing – Shandong University of Science and Technology Selection
+
 ## Introduction
-This project is qualified for participation in the "National Pioneer Cup on Intelligent Computing – Shandong University of Science and Technology Selection
 
 This research aims to develop a novel deep learning framework called the Exogenous-to-Endogenous Frequency-Aware Network (E2E-FANet), with the direct objective of achieving high-precision prediction of free surface elevation behind floating breakwaters. 
 
