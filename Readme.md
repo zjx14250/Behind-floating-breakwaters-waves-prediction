@@ -11,7 +11,9 @@ The core innovations of this model lie in:
 ![Framework of the proposed E2E-FANet](figure/image.png)
 
 ## Run
+```bash
 bash ./scripts/wave_forecast/E2EFANet.sh
+```
 
 ## Result
 ![图片描述](figure/result1.png)
