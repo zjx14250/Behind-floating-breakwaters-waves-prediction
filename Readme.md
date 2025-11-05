@@ -9,6 +9,11 @@ The core innovations of this model lie in:
 ## E2E-FANet
 ![Framework of the proposed E2E-FANet](figure/image.png)
 
+## Install requirements
+```bash
+pip install -r requirements.txt
+```
+
 ## Run
 ```bash
 bash ./scripts/wave_forecast/E2EFANet.sh
